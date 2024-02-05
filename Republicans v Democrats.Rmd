@@ -1,0 +1,24 @@
+---
+title: "Congress Voting"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+date: "2024-02-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+``` {r}
+# Red or Blue? Who do Americans want in office more: Republicans or Democrats?
+## I imported the data from fivethirtyeight website , I right clicked on it to view databases & viewed file in RStudio. I removed columns 3 - 6.
+library(readr)
+library(ggplot2)
+generic_ballot_averages <- read_csv("~/Documents/Educational Documents/CUNY SPS SPRING 2024/Data 607/generic_ballot_averages.csv")
+data <- generic_ballot_averages [, 3:6]
+```
+``` {r}
+ggplot(data=data, aes(x = election)) + geom_bar()
+## this graph shows the amount of voters over the election year who opted for republicans in office. 
+```
