@@ -1,0 +1,95 @@
+---
+title: "Analyzing Arrivals/Delays AM West & Alaska"
+author: "Markella Gialouris"
+date: "2024-02-26"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+# Load necessary packages
+
+library(dplyr)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+## Creating the CSV file
+
+This report will analyze the arrival delays between both AM West & Alaska airlines, and demonstrate the difference in analytics between the two.
+
+First, I will be creating the CSV file using the following code:
+
+```{r}
+ airline <- c("Alaska", "AM West")
+ city <- c("Los Angeles", "Phoenix", "San Diego", "San Francisco", "Seattle")
+on_time_alaska <- c(497, 221, 212, 503, 1841)
+delayed_alaska <- c(62, 12, 20, 102, 305)
+on_time_amwest <- c(694, 4840, 383, 320, 201)
+delayed_amwest <- c(117, 415, 65, 129, 61)
+alaska_data <- data.frame(Airline = rep("Alaska", length(city)), City = city, On_Time = on_time_alaska, Delayed = delayed_alaska)
+amwest_data <- data.frame(Airline = rep("AM West", length(city)), City = city, On_Time = on_time_amwest, Delayed = delayed_amwest)
+
+combined_data <- rbind(alaska_data, amwest_data)
+
+write.csv(combined_data, file = "airline_data.csv", row.names = FALSE)
+```
+
+## Creating the "wide" structure table.
+
+Using the below code, I went ahead and created a "wide" table with the given data.
+
+```{r}
+wide_table <- tidyr::pivot_wider(combined_data, names_from = City, values_from = c(On_Time, Delayed))
+
+write.csv(wide_table, file = "wide_table_data.csv", row.names = FALSE)
+```
+
+## Tidying the Data
+
+```{r}
+result <- with(tidy_data, aggregate(Count, by = list(Airline, City, Status), FUN = sum))
+colnames(result) <- c("Airline", "City", "Status", "Total_Count")
+```
+
+## Analyzing the Data
+
+In order to properly analyze my data, I went ahead and created a bar graph to physically demonstrate the numbers in arrivals delays using the following code.
+
+```{r}
+delayed_data <- result %>%
+  filter(Status == "Delayed")
+```
+
+First, I went ahead and filtered the data to only include the 'Delayed' status flights.
+
+I then went ahead and created a bar graph to better analyze the given data.
+
+As a result of analyzing the data, it is found that customers who make the choice to travel with AM West are more likely to experience delays in their flights when arriving at their final destinations.
+
+```{r}
+ggplot(delayed_data, aes(x = Airline, y = Total_Count, fill = Airline)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Comparison of Arrival Delays Between Airlines",
+       x = "Airline",
+       y = "Total Delay Count") +
+  theme_minimal()
+```
+
+Additionally, to be more specific, I decided to find the mean average of flights that are delayed from AM West. This number turned out to be 157.4 flights. In order to do so, I went ahead and filtered the data to calculate the mean by focusing on the delayed flights.
+
+```{r}
+amwest_delayed <- result %>%
+  filter(Airline == "AM West", Status == "Delayed")
+
+mean_delayed_amwest <- mean(amwest_delayed$Total_Count)
+```
+
+## Conclusion
+
+In conclusion, customers who have decided to travel with AM West will be more likely to experience a delayed flight versus that of customers who have decided to fly with Alaskan airlines.
