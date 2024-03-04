@@ -1,0 +1,425 @@
+---
+title: "Project 2: Markella Gialouris"
+output: html_document
+date: "2024-02-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+```
+
+## This project was completed by Markella Gialouris & Nikoleta Emmanoulidi.
+
+### In this dataset, we explored the effects of COVID-19 on public health and examined its impact on both vaccinated and unvaccinated individuals. Our target focus in this dataset was to analyze the incidence of cases and fatalities, and pinpoint the periods where these numbers were at their peak.
+
+#### First, we will begin by taking the untidy data, and creating a CSV file using the code below:
+
+```{r}
+Covid_untidy <- read.csv("https://raw.githubusercontent.com/NikoletaEm/607LABS/main/Rates_of_COVID-19_Cases_or_Deaths_by_Age_Group_and_Updated__Bivalent__Booster_Status_20240225.csv")
+```
+
+#### Since our prepared CSV file includes data that is untidy, we will move on to the next step that involves cleaning up the dataframe through renaming and refinding the operations. This dataset comes with predefined columns. For example: we have a column that is titled "mmwr_week". The title "mmwr_week" actually refers to the week within the epidemiologic year being defined as: "202140". The '2021' portion implies the year (2021) and the '40' portion refers to the 40th week of the year. This leaves us in October, 2021. For our analysis, we will select and refine these prenamed columns to extract only the essential information needed to proceed.
+
+### Source: <https://ibis.doh.nm.gov/resource/MMWRWeekCalendar.html>
+
+```{r}
+Covid_untidy <- Covid_untidy %>%
+  mutate(unvaccinated_population = as.character(unvaccinated_population)) %>%
+  pivot_longer(
+    cols = c("age_group", "unvaccinated_population","month"),
+    names_to = "Covid_stats",
+    values_to = "Values"
+  )
+```
+
+#### The next step in our analysis is to transition to transforming the data into a longer format. This process involves reshaping the data to achieve a more structured and organized layout that facilitates easier analysis visualizations. By being able to pivot the data into a longer format, we will be able to effectively streamline the information and enhance its interpretability ultimately showcasing our focus on the deaths.
+
+#### In the code below we are focusing speicifically on the parts of the dataset that include the outcome counts, the mmwr_week, the stats, values and the unvaccinated outcome.
+
+```{r}
+Covid_tidy<- Covid_untidy %>% 
+  select("outcome","mmwr_week","Covid_stats","Values","unvaccinated_with_outcome","vaccinated_with_outcome")
+```
+
+#### The following code calculates the percentage of outcomes and generates a dataframe consisting of three key columns to help us with our analysis: "outcome", "count", and "percentage". Each of these elements signifies a distinct aspect of our data structure. The "outcome" column denotes the individuals who contracted the virus and succumbed to it, while the "count" column quantifies the number of people under study. The "percentage" column encapsulates the remaining information derived from the analysis.
+
+```{r}
+outcome_counts <- Covid_tidy %>%
+  group_by(outcome) %>%
+  summarise(Count = n())
+
+Outcome_counts <- as.data.frame(outcome_counts)
+colnames(Outcome_counts) <- c("Outcome", "Count")
+Outcome_counts$Percentage <- (Outcome_counts$Count / sum(Outcome_counts$Count)) * 100
+```
+
+### Below, we utilize 'ggplot2' to visually represent our findings.
+
+# Visualizing Data With 'ggplot2'
+
+```{r}
+ggplot(Outcome_counts, aes(x = Outcome, y = Count, fill = Outcome)) +
+  geom_bar(stat = "identity") +
+    geom_text(aes(label = paste0(round(Percentage, 2), "%")), 
+            position = position_stack(vjust = 0.5), 
+            color = "black", size = 4) +
+  scale_fill_manual(values = c("case" = "lightgreen", "death" = "lightblue")) +  # Specify fill colors
+  labs(x = "Outcome", y = "Count", title = "Counts of Cases and Deaths")  +
+  theme_minimal()
+```
+
+#### After creating a fresh dataframe and computing their percentages, it is apparent that the number of cases outweighs the number of deaths.
+
+```{r}
+cases_data <- Covid_tidy %>%
+  filter(outcome == "case")
+
+cases_data$date <- as.Date(paste(substr(cases_data$mmwr_week, 1, 4), "-W", substr(cases_data$mmwr_week, 5, 6), "-1", sep = ""), format = "%Y-W%U-%u")
+```
+
+## Creating a Time Series Plot
+
+```{r}
+ggplot(cases_data, aes(x = date, y = unvaccinated_with_outcome)) +
+  geom_line() +
+  labs(x = "Date", y = "Cases", title = "Time Series of COVID-19 Cases (Unvaccinated)") +
+  theme_minimal()
+```
+
+#### In the above codeblock, we extracted the year and week portions of the mmwr_Week column. The objective is to group the data by year, which is indicated by the first four digits that will analyze the trends over time. Subsequently, we combined these components in the "ISO" week/date format: (%Y-W%U-%u) which represents the year, week number and weekday. By using the 'as.Date()' code, I was able to convert this string into a Date object in R. The resulting time series plot illustrates the progression of COVID-19 cases over time, with each data point representing the number of cases that are recorded on a specific date. Notably, there is a surge in cases among unvaccinated individuals during the early half of 2022. To validate our findings, we need to confirm the year with the highest case count.
+
+```{r}
+Covid_tidy <- Covid_tidy %>%
+  mutate(year = substr(mmwr_week, 1, 4))
+
+cases_unvaccinated <- Covid_tidy %>%
+  filter(outcome == "case" & unvaccinated_with_outcome > 0) %>%
+  group_by(year) %>%
+  summarise(total_cases = sum(unvaccinated_with_outcome))
+
+max_cases_year_data <- cases_unvaccinated %>%
+  filter(total_cases == max(total_cases))
+
+max_cases_year <- max_cases_year_data %>%
+  pull(year)
+max_cases_number <- max_cases_year_data %>%
+  pull(total_cases)
+
+print(paste("Year with the highest number of cases:", max_cases_year))
+print(paste("Number of cases in the highest year:", max_cases_number))
+```
+
+#### Based on the data, it seems that the number of cases for unvaccinated individuals shows that they are more likely to succumb to their sickness, versus those who are vaccinated.
+
+#### The code above verifies the accuracy of the graph. It confirms that 2022 accurately represented itself as the year with the highest case count. Specifically, the total number of cases recorded for that year amounted to 77,598,648.
+
+## **Vaccinated Data: Cases**
+
+### Plot
+
+#### The following code block generates a plot using data from the 'vaccinated_data' subset of the 'Covid_tidy' dataset. This plot aims to illustrate the amount of patients who were vaccinated, but still contracted the COVID-19 virus.
+
+```{r}
+vaccinated_data <- Covid_tidy%>%
+  filter(outcome == "case" & !is.na(vaccinated_with_outcome))
+
+
+vaccinated_data <- vaccinated_data %>%
+  group_by(mmwr_week) %>%
+  summarise(mean_cases = mean(vaccinated_with_outcome, na.rm = TRUE))
+```
+
+## **Creating a Time Series Plot**
+
+```{r}
+ggplot(vaccinated_data, aes(x = mmwr_week, y = mean_cases)) +
+  geom_line(color = "blue") +
+  geom_smooth(method = "loess", color = "purple") +
+  labs(x = "Week", y = "Mean Cases", title = "Time Series of COVID-19 Cases (Vaccinated)") + theme_minimal()
+```
+
+```{r}
+cases_vaccinated <- Covid_tidy %>%
+  filter(outcome == "case" & vaccinated_with_outcome > 0)
+
+cases_vaccinated <- cases_vaccinated %>%
+  mutate(year = substr(mmwr_week, 1, 4)) 
+
+cases_vaccinated_summary <- cases_vaccinated %>%
+  group_by(year) %>%
+  summarise(total_cases = sum(vaccinated_with_outcome))
+
+max_cases_vaccinated_year <- cases_vaccinated_summary %>%
+  filter(total_cases == max(total_cases)) %>%
+  pull(year)
+
+max_cases_vaccinated_number <- max(cases_vaccinated_summary$total_cases)
+
+print(paste("Year with the highest number of cases (vaccinated):", max_cases_vaccinated_year))
+print(paste("Number of cases in the highest year (vaccinated):", max_cases_vaccinated_number))
+```
+
+#### The preceding graph depicts the trends in COVID-19 cases, with emphasis on identifying the peak year (2022) during which positive cases spiked.
+
+## **VACCINATED DATA: DEATHS**
+
+```{r}
+deaths_vaccinated_data <- Covid_tidy %>%
+  filter(outcome == "death" & !is.na(vaccinated_with_outcome))
+
+deaths_vaccinated_data <- deaths_vaccinated_data %>%
+  group_by(mmwr_week) %>%
+  summarise(mean_deaths = mean(vaccinated_with_outcome, na.rm = TRUE))
+```
+
+## Time Series Plot for Deaths in Vaccinated Individuals
+
+```{r}
+ggplot(deaths_vaccinated_data, aes(x = mmwr_week, y = mean_deaths)) +
+  geom_line(color = "darkblue") +
+  geom_smooth(method = "loess", color = "darkred") +
+  labs(x = "Week", y = "Mean Deaths", title = "Time Series of COVID-19 Deaths (Vaccinated)") +
+  theme_minimal()
+```
+
+#### The code snippet will generate a plot intended to visualize the data from the 'deaths_vaccinated' dataset. This dataset comprises metrics indicating the number of patients who were vaccinated but succumbed to COVID-19.
+
+## Highest Year of Death
+
+```{r}
+deaths_vaccinated <- Covid_tidy %>%
+  filter(outcome == "death" & vaccinated_with_outcome > 0) %>%
+  group_by(year) %>%
+  summarise(total_deaths = sum(vaccinated_with_outcome))
+
+max_deaths_vaccinated_year_data <- deaths_vaccinated %>%
+  filter(total_deaths == max(total_deaths))
+
+max_deaths_vaccinated_year <- max_deaths_vaccinated_year_data %>%
+  pull(year)
+
+max_deaths_vaccinated_number <- max_deaths_vaccinated_year_data %>%
+  pull(total_deaths)
+
+print(paste("Year with the highest number of deaths in vaccinated individuals:", max_deaths_vaccinated_year))
+print(paste("Number of deaths in the highest year in vaccinated individuals:", max_deaths_vaccinated_number))
+```
+
+#### In summary, the code block above calculates the highest number of vaccinated patients who contracted and succumbed to COVID-19. It validates that 2022 accurately records the most precise data, with 246,813 individuals having passed away from the virus. Despite the significant number of deaths, the ratio of cases to deaths indicates a higher survival rate, suggesting the effectiveness that being vaccinated ***does*** protect against severe outcomes. This underscores the importance of vaccination in reducing the overall impact of the virus and increasing the likelihood of survival.
+
+# DATA SET 2: MARRIAGE RATES IN THE UNITED STATES
+
+### The data set below provides a comprehensive overview of marital status rates among women in the U.S. in certain age groups and considers their employment statuses. Considering the importance of the societal structure that surrounds marriage, and the evolving role of women in the owrkforce, we take a look at the numbers and see how they compare. By analyzing this data, the aim is to gain a deeper understanding of which age groups speicifically see the highest number of marriage rates and look at how these factors influence marital trends in our society.
+
+```{r}
+Marriages_US <- read.csv("https://raw.githubusercontent.com/btc2628/DATA607/main/Week%205%20Discussion/ACSST1Y2022.S1201-2024-02-20T191328.csv")
+```
+
+## Reading CSV
+
+#### To begin our analysis, we must create a CSV file, and begin to clean our untidy data. This involves isolating the information that specifically pertains to the female demographic. In the "females" dataset, and the "females_labor" dataset, we have cleaned our data by breaking down the original file, and refining it to show females based on their marital status (single, married, widowed, etc.) and shown the amount of females in the laborforce.
+
+```{r}
+females_untidy <- Marriages_US[10:16,]
+females_labor <-Marriages_US[32:33,]
+```
+
+```{r}
+max <- sapply(females_untidy, max) 
+print(max)
+```
+
+#### The above code block removes the first few columns in order to refine the data to show females specifically, and break it down by the females in the laborforce, and also pulls out the top numbers of each category to give us a btter understanding.
+
+## Using Pivot Longer To Clean Our Data
+
+#### Using the pivot longer command in this dataset was essential for cleaning and organizing the large amount of data we are analyzing. Its application allowed me to streamline and condense the large datasets into more manageable blocks, and focus primarly on the data relevant to my analysis. By reshaping the data, I was able to ensure accuracy, and prepare for latter visualizations. Below is the code block demonstrating how I reshaped the data to facilitate further analysis and visualization.
+
+```{r}
+females <- data.frame(
+  age_group = c("20-34 years", "35 to 44 years", "45-54 years", "55-64 years"),
+  total = c(33160377, 21785279, 20175854, 21471526),
+  married = c(32.0, 61.4, 63.0, 60.2),
+  widowed = c(0.2, 0.8, 2.4, 6.8),
+  divorced = c(3.1, 11.2, 17.2, 19.8),
+  separated = c(1.2, 3.0, 3.1, 2.6),
+  never_married = c(63.5, 23.6, 14.3, 10.6)
+)
+females_cleaned <- females %>%
+  pivot_longer(cols = -age_group,
+               names_to = "marital_status",
+               values_to = "percentage")
+females_cleaned$marital_status <- factor(females_cleaned$marital_status,
+                                    levels = c("total", "married", "widowed", "divorced", "separated", "never_married"),
+                                    labels = c("Total", "Married", "Widowed", "Divorced", "Separated", "Never Married"))
+print(females_cleaned)
+```
+
+## Visualizing the Data
+
+#### To visualize the cleaned data, I generated separate bar graphs for each group of women categorized by marital status, including married, divorced, separated, widowed, and never married. Each bar graph is color-coded to highlight the range between the highest and lowest percentages of marital statuses within the female demographic.
+
+### Percentage of Women Married by Selected Age Groups
+
+```{r}
+married_data <- females_cleaned %>%
+  filter(marital_status == "Married")
+ggplot(married_data, aes(x = age_group, y = percentage)) +
+  geom_bar(stat = "identity", fill = "lightpink") +
+  geom_text(aes(label = paste0(percentage, "%")), vjust = -0.5, color = "black", size = 3) +
+  labs(title = "Married Percentage by Age Group",
+       x = "Age Group",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+#### According to the data depicted in the above graph, women aged 45-54 years who are married appear to dominate the chart. This trend is possibly attributed to upbringing during a generation when marriage held significant societal importance. Furthermore, their sustained high representation in successful marriages may contribute to this dominance in the demographic.
+
+### Percentage of Women Divorced by Selected Age Groups
+
+```{r}
+divorced_data <- subset(females_cleaned, marital_status == "Divorced")
+text_labels <- c("3.1%", "11.2%", "17.2%", "19.8%")
+ggplot(divorced_data, aes(x = age_group, y = percentage)) +
+  geom_bar(stat = "identity", fill = "darkblue") +
+  geom_text(aes(label = text_labels), vjust = -0.5, size = 4) + # Add text labels
+  labs(title = "Divorced Percentage by Age Group",
+       x = "Age Group",
+       y = "Percentage") +
+  theme_minimal()
+```
+
+#### From the data depicted in the graph above, it appears that women in the 55-64 age group are notably predominant in the divorced category. This trend may be attributed to various factors such as infidelity, amicable disagreements, or other factors. Given that these women are likely in their later stages of life, it is plausible that they experienced divorce after starting a family, although the specific reasons remain unclear due to the limited data available.
+
+### Percentage of Women Separated by Selected Age Groups
+
+```{r}
+separated_data <- females_cleaned[females_cleaned$marital_status == "Separated", ]
+ggplot(separated_data, aes(x = age_group, y = percentage)) +
+  geom_bar(stat = "identity", fill = "purple") +
+  geom_text(aes(label = paste0(percentage, "%")), vjust = -0.5) +
+  labs(title = "Separated Percentages by Age Group",
+       x = "Age Group",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+#### Similar to the graph illustrating the age group of married women, this visualization suggests that women in the 45-54 age bracket hold a prominent position in the separated category of our analysis. Despite the relatively lower percentages (meaning out of 100), this age group continues to appear In a similar vein to the graph illustrating the age group of married women, this particular visualization suggests that women in the 45-54 age bracket hold a prominent position in the separated category of our analysis. Despite the relatively lower percentages, this age group continues to exert significant influence in marriage trends. 
+
+### Percentage of Widowed Women by Selected Age Groups
+
+```{r}
+females_cleaned <- data.frame(
+  age_group = c("20-34 years", "35-44 years", "45-54 years", "55-64 years"),
+  widowed_percentage = c(0.2, 0.8, 2.4, 6.8)
+)
+
+ggplot(females_cleaned, aes(x = age_group, y = widowed_percentage)) +
+  geom_bar(stat = "identity", fill = "lightgray") +
+  geom_text(aes(label = paste0(widowed_percentage, "%")), vjust = -0.5, color = "black") +
+  labs(title = "Widowed Percentage by Age Group",
+       x = "Age Group",
+       y = "Widowed Percentage") +
+  theme_minimal()
+```
+
+#### In the widowed category, it appears that the demographic aged 55-64 leads with the highest number of women who have been widowed. While our data is limited, it is reasonable to infer, based on demographic trends, that this phenomenon likely stems from various factors such as losing a partner to illness, death resulting from illness, or potentially losing a spouse in military service. Given the age group, speculation surrounding the plausibility of these losses may be linked to military service, as during their formative years, military enlistment and marriage for starting a family were prevalent societal norms. However, that is just an observation and an assumption as we do not have definitive data confirming that theory.
+
+### Percentage of Women Never Married/Single by Selected Age Groups
+
+```{r}
+never_married_data <- data.frame(
+  age_group = c("20-34 years", "35-44 years", "45-54 years", "55-64 years"),
+  never_married_percentage = c(63.5, 23.6, 14.3, 10.6)
+)
+ggplot(never_married_data, aes(x = age_group, y = never_married_percentage)) +
+  geom_bar(stat = "identity", fill = "darkorange") +
+  geom_text(aes(label = paste0(never_married_percentage, "%")), vjust = 1.5, color = "black") +
+  labs(title = "Never Married Percentages by Age Group",
+       x = "Age Group",
+       y = "Never Married Percentage") +
+  theme_minimal()
+```
+
+#### In the never-married category, the youngest demographic we examined, ages 20-34 years, exhibits the highest percentage. This trend likely arises from several factors, but it is reasonable to assume that many women in this age group are still in the process of navigating their journey to find a suitable partner, establish themselves professionally, and strive to achieve a balance between pursuing their future goals and managing their current responsibilities.
+
+## Percentages of Women in the Labor Force Based on Marital Status
+
+```{r}
+femalelabor_cleaned <- data.frame(
+  row = c("Females 16y and Older", "In Labor Force"),
+  total = c(136948302, 80491996),
+  married = c(47.0, 47.3),
+  divorced = c(12.1, 12.3),
+  separated = c(1.9, 2.2),
+  widowed = c(8.5, 2.7),
+  never_married = c(30.5, 35.6)
+)
+
+femalelabor_cleaned <- femalelabor_cleaned %>%
+  pivot_longer(cols = -row,
+               names_to = "marital_status",
+               values_to = "percentage")
+print(femalelabor_cleaned)
+```
+
+### TOTAL NUMBER OF WOMEN IN THE WORK FORCE BROKEN DOWN BY THEIR MARITAL STATUS
+
+```{r}
+workforce_data<- data.frame(
+  marital_status = c("Married", "Divorced", "Separated", "Widowed", "Never Married"),
+  percentage = c(47.3, 12.3, 2.2, 2.7, 35.6)
+)
+total_labor_force <- 80491996
+workforce_data$number <- workforce_data$percentage / 100 * total_labor_force
+
+ggplot(workforce_data, aes(x = marital_status, y = number, group = 1)) +
+  geom_line(color = "black") +
+  geom_point(color = "blue", size = 3) +
+  labs(title = "Number of Women in the Labor Force Aged 16 and Older by Marital Status",
+       x = "Marital Status",
+       y = "Number of Women",
+       caption = "Data Source: Your Source") +
+  theme_minimal()
+```
+
+### Analysis Summary
+
+#### Upon analyzing the age demographics with the highest number of women in each marital status category, and subsequently refining the data to focus on women in the workforce, I have reached the final conclusion that married women constitute the largest portion of women in the workforce based on their marital status. This outcome was somewhat surprising, as I initially expected the "never married" or divorced/separated categories to have the highest representation. This assumption stemmed from the observation that the "never married" category had the highest number of women, and in today's society, many women are prioritizing their careers over traditional gender roles. However, upon reflection, it is not entirely unexpected to find that many women in the workforce are still married, given the ongoing efforts to balance family responsibilities with career aspirations.
+
+# DATA SET 3: NYC GIFTED AND TALENTED
+### In the final dataset for project 2, we are taking a look at New York City's D.O.E Gifted and Talented Scores. Our goal upon taking a look at this dataset is to show which district had the highest scores for gifted and talented students in 2018, based on what grade they are entering and what month they were born. This info is worth taking a look at, since based on the month that students are often born, it will determine when they can start school. Students who are born in the beginning half of the year often start "late" giving them more time to learn in the home by their family or even at pre-kindergarten. Students born in the later half of the year usually start school on at the time that they were supposed to, which often puts them on track with their expected learning grade. However, as a former gifted and talented student, I personally have always found that other classmates born in the earlier half of the year, including myself, seemed to be learning and comprehending the information being taught to us quicker than the other students who were not born earlier in the year. 
+
+## Reading the CSV File 
+```{r}
+NYC2018Gifted <- read.csv("https://raw.githubusercontent.com/mgialouris/data607/main/NYC%20Gifted%20and%20Talented%20Grades%202018-19%20-%20Sheet5.csv")
+```
+
+```{r}
+gifted_untidy <- NYC2018Gifted[, c("Timestamp", "Entering.Grade.Level", "District", "Birth.Month", "Overall.Score")]
+```
+### SUBSET OF GIFTED AND TALENTED STUDENTS BROKEN DOWN BY DISTRICT, SCORE AND GRADE LEVEL. 
+### subset created to focus on districts. 
+```{r}
+gifted_subset <- NYC2018Gifted[c("District", "Overall.Score", "Entering.Grade.Level", "Birth.Month")]
+head(gifted_subset)
+```
+```{r}
+tidy_gifted_untidy <- gifted_untidy
+```
+
+```{r}
+max <- sapply(gifted_untidy, max) 
+print(max)
+```
+
+## Analysis. 
+#### In the datasets provided, I have carefully refined the data to focus on four key columns: districts, overall scores, entering grade levels, and birth months. I chose these columns to best capture the essence of my analysis, aiming to identify the district with the highest scores and uncover the birth months of the students. Upon examining the gifted_untidy dataset, it becomes apparent that the maximum score, grade level, and birth month coincide for a student from District 32, entering Kindergarten, with an overall score of 99, born in September. Further exploration reveals that many students who scored 99 in 2018 were also entering Kindergarten, predominantly from school district 2, and tended to have birth months in the latter half of the year. This data suggests that the age demographic and birth timing align with the notion that young children possess remarkable adaptability and can absorb knowledge from an early age. While some students may inherently exhibit giftedness, I personally contend that environmental factors also play a significant role in their development.
