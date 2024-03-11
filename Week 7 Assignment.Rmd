@@ -1,0 +1,249 @@
+---
+title: "Week 7 Assignment"
+output:
+  html_document: default
+  pdf_document: default
+date: "2024-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Working with XML and JSON in R.
+
+## Books of Choice
+
+#### For this assignment, I selected three books that were part of my "recent reads" from the summer: "Getting to Yes" by Roger Fisher, William L. Ury, and Bruce Patton; "Diary of a CEO" by Steven Bartlett; and "Psychology of Money" by Morgan Housel. I chose these books because they became a significant part of my post-graduation journey. After completing my B.S. degree and facing setbacks in my original career plans, I found myself at a crossroads, contemplating whether to pursue a degree in Data Science.
+
+#### With no academic assignments to occupy my mind, I craved constant mental stimulation. Engaging in activities that challenged me and allowed for continuous learning became essential. Reading books that promised mental stimulation and skill development seemed like a natural choice. Throughout my college career, I had explored diverse subjects such as finance, business/marketing, medicine, and now data analytics.
+
+#### These three books proved to be invaluable resources, offering insights into various aspects of life, particularly mental health and the profound influence of psychology in our daily experiences. They provided me with a deeper understanding of the role psychology plays beyond moments of anxiety or depression. Each book enriched my perspective and equipped me with valuable skills that I believe will be instrumental in shaping my future endeavors.
+
+## Dataframe 1: HTML
+
+```{r}
+library(rvest)
+library(xml2)
+library(jsonlite)
+library(dplyr)
+library(purrr)
+```
+
+```{r eval=TRUE}
+html_content <- '
+<table>
+  <tr>
+    <th>Title</th>
+    <th>Author(s)</th>
+    <th>Notes</th>
+  </tr>
+  <tr>
+    <td>Getting to Yes</td>
+    <td>Roger Fisher, William L. Ury, Bruce Patton</td>
+    <td>Negotiation principles and strategies.</td>
+  </tr>
+  <tr>
+    <td>Diary of a CEO</td>
+    <td>Steven Bartlett</td>
+    <td>Insights into entrepreneurship and leadership.</td>
+  </tr>
+  <tr>
+    <td>Psychology of Money</td>
+    <td>Morgan Housel</td>
+    <td>Behavioral economics and personal finance.</td>
+  </tr>
+</table>
+'
+writeLines(html_content, "books.html")
+```
+
+## Dataframe 2: XML
+```{r, eval=TRUE}
+xml_content <- '
+<books>
+  <book>
+    <title>Getting to Yes</title>
+    <author>Roger Fisher, William L. Ury, Bruce Patton</author>
+    <notes>Negotiation principles and strategies.</notes>
+  </book>
+  <book>
+    <title>Diary of a CEO</title>
+    <author>Steven Bartlett</author>
+    <notes>Insights into entrepreneurship and leadership.</notes>
+  </book>
+  <book>
+    <title>Psychology of Money</title>
+    <author>Morgan Housel</author>
+    <notes>Behavioral economics and personal finance.</notes>
+  </book>
+</books>
+'
+writeLines(xml_content, "books.xml")
+```
+
+## Dataframe 3: JSON
+```{r, eval=TRUE}
+json_content <- '[
+  {
+    "title": "Getting to Yes",
+    "author": "Roger Fisher, William L. Ury, Bruce Patton",
+    "notes": "Negotiation principles and strategies."
+  },
+  {
+    "title": "Diary of a CEO",
+    "author": "Steven Bartlett",
+    "notes": "Insights into entrepreneurship and leadership."
+  },
+  {
+    "title": "Psychology of Money",
+    "author": "Morgan Housel",
+    "notes": "Behavioral economics and personal finance."
+  }
+]'
+writeLines(json_content, "books.json")
+```
+
+## Loading the Content & Parsing the Data from All Three Dataframes
+
+### HTML
+```{r}
+html_data <- read_html("books.html")
+```
+
+```{r}
+html_df <- html_data %>%
+  html_nodes("table") %>%
+  html_table() %>%
+  .[[1]]
+```
+
+## Creating the Column Names in the HTML Dataframe.
+```{r}
+colnames(html_df) <- c("title", "author", "notes")
+```
+
+```{r}
+html_df <- data.frame(lapply(html_df, as.character), stringsAsFactors = FALSE)
+```
+
+```{r}
+html_df <- html_df[order(html_df$title), ]
+```
+
+### Loading and Parsing XML.
+```{r}
+xml_data <- read_xml("books.xml")
+```
+
+```{r}
+xml_df <- xml_data %>%
+  xml_find_all("//book") %>%
+  map_df(~data.frame(
+    title = xml_text(xml_find_first(.x, "./title")),
+    author = xml_text(xml_find_first(.x, "./author")),
+    notes = xml_text(xml_find_first(.x, "./notes"))
+  ))
+
+print(xml_df)
+```
+
+### Loading JSON
+```{r}
+json_df <- fromJSON("books.json")
+
+print(json_df)
+```
+
+## Compare Data Frames
+```{r}
+identical(html_df, xml_df) && identical(html_df, json_df)
+```
+
+```{r}
+str(html_df)
+str(xml_df)
+str(json_df)
+```
+
+```{r}
+html_df <- data.frame(lapply(html_df, as.character), stringsAsFactors = FALSE)
+xml_df <- data.frame(lapply(xml_df, as.character), stringsAsFactors = FALSE)
+json_df <- data.frame(lapply(json_df, as.character), stringsAsFactors = FALSE)
+```
+
+```{r}
+html_df <- data.frame(lapply(html_df, trimws), stringsAsFactors = FALSE)
+xml_df <- data.frame(lapply(xml_df, trimws), stringsAsFactors = FALSE)
+json_df <- data.frame(lapply(json_df, trimws), stringsAsFactors = FALSE)
+```
+
+```{r}
+html_df <- html_df[order(html_df$title), ]
+xml_df <- xml_df[order(xml_df$title), ]
+json_df <- json_df[order(json_df$title), ]
+```
+
+```{r}
+html_df <- as.data.frame(html_df)
+```
+
+```{r}
+html_df <- html_df[order(html_df$title), ]
+```
+
+```{r}
+if (!is.data.frame(html_df)) {
+  print("html_df is not a data frame.")
+} else {
+  print("html_df is a data frame.")
+}
+```
+
+```{r}
+if ("title" %in% colnames(html_df)) {
+  print("Column 'title' exists in html_df.")
+} else {
+  print("Column 'title' does not exist in html_df.")
+}
+```
+
+```{r}
+str(html_df)
+str(xml_df)
+str(json_df)
+```
+
+```{r}
+html_df <- data.frame(lapply(html_df, as.character), stringsAsFactors = FALSE)
+xml_df <- data.frame(lapply(xml_df, as.character), stringsAsFactors = FALSE)
+json_df <- data.frame(lapply(json_df, as.character), stringsAsFactors = FALSE)
+```
+
+```{r}
+html_df <- data.frame(lapply(html_df, trimws), stringsAsFactors = FALSE)
+xml_df <- data.frame(lapply(xml_df, trimws), stringsAsFactors = FALSE)
+json_df <- data.frame(lapply(json_df, trimws), stringsAsFactors = FALSE)
+```
+
+```{r}
+html_df <- html_df[order(html_df$title), ]
+xml_df <- xml_df[order(xml_df$title), ]
+json_df <- json_df[order(json_df$title), ]
+```
+
+## Confirmed?: Are all 3 Dataframes Identical?
+```{r}
+identical(html_df, xml_df)
+identical(html_df, json_df)
+identical(xml_df, json_df)
+```
+
+```{r}
+all.equal(html_df, xml_df)
+all.equal(html_df, json_df)
+all.equal(xml_df, json_df)
+```
+
+## The Result: 
+### The fact that all three of my data frames are identical suggests that the information extracted from the HTML, XML, and JSON sources for all three books is consistent. This indicates that the parsing of data was accurate and successful, resulting in reliable information across all formats. It implies that the choice of format does not impact the accuracy of the information provided. Moreover, it suggests that the data can be used interchangeably, offering flexibility in how it can be utilized and manipulated according to preference.
